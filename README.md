@@ -10,16 +10,11 @@ BISINDO Gesture Recognition adalah proyek pengenalan gerakan Bahasa Isyarat Indo
 - **scikit-learn (Random Forest)** — model ML untuk klasifikasi gesture
 - **gTTS / pyttsx3** — Text-to-Speech untuk output suara
 
----
-
 ## Arsitektur Sistem
-
-```
 Kamera → MediaPipe → Normalisasi → ML Model → Stabilizer → TTS + Teks
  (OpenCV)  (21 titik    (relatif ke    (Random    (confidence    (output)
             × 3 coord    wrist)        Forest)     filtering)
             per tangan)
-```
 
 **Alur data per frame:**
 1. **Kamera** → ambil frame video
@@ -30,7 +25,6 @@ Kamera → MediaPipe → Normalisasi → ML Model → Stabilizer → TTS + Teks
 6. **Stabilizer** → filter noise, hanya output jika confidence > threshold
 7. **TTS** → baca huruf/kata yang terbentuk
 
----
 
 ## Huruf BISINDO
 
@@ -42,7 +36,6 @@ A, B, D, F, K, P, Q, T, W, X
 
 > **Catatan:** J dan Z adalah gesture dinamis (ada gerakan). Untuk v2.0, cukup tahan posisi akhir gesture saat merekam data.
 
----
 
 ## Cara Pakai
 
@@ -97,20 +90,12 @@ python src/main.py
 | **ENTER**     | Baca teks sekarang (TTS) |
 | **R**         | Reset semua teks         |
 | **ESC**       | Keluar                   |
-
 **Otomatis:** Jika tangan dilepas selama 2 detik, TTS akan membaca teks yang sudah terkumpul.
 
-```
-
----
-
 ## Tips Pengumpulan Data
-
 1. **Pencahayaan** — pastikan ruangan terang dan merata
 2. **Latar belakang** — gunakan latar polos (bukan ramai)
 3. **Variasi** — geser tangan sedikit (atas/bawah/kiri/kanan) saat merekam agar model lebih robust
 4. **Jarak** — variasikan jarak tangan ke kamera (dekat dan jauh)
 5. **Kedua tangan** — untuk huruf 2 tangan, pastikan **kedua** tangan terlihat
 6. **Cek sampel** — jika akurasi huruf tertentu rendah, tambahkan sampel baru
-
----
