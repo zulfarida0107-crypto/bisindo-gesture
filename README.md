@@ -100,29 +100,6 @@ python src/main.py
 
 **Otomatis:** Jika tangan dilepas selama 2 detik, TTS akan membaca teks yang sudah terkumpul.
 
----
-
-## Struktur File
-
-```
-bisindo-gesture/
-├── dataset/                    # CSV data landmark (hasil collect_data.py)
-│   ├── bisindo_A.csv
-│   ├── bisindo_B.csv
-│   └── ...
-├── src/
-│   ├── collect_data.py         # Script pengumpulan data landmark
-│   ├── train_model.py          # Script pelatihan model ML
-│   ├── gesture_model.pkl       # Model ML terlatih (hasil train_model.py)
-│   ├── main.py                 # Aplikasi utama (real-time detection)
-│   ├── gesture_classifier.py   # ML classifier (load model + predict)
-│   ├── stabilizer.py           # Gesture stabilizer (anti-jitter)
-│   ├── tts.py                  # Text-to-Speech engine
-│   ├── finger_utils.py         # Utilitas geometri jari (legacy)
-│   ├── bisindo_rule.py         # Rule-based classifier (legacy, tidak dipakai)
-│   └── ...
-├── venv/                       # Virtual environment Python
-└── README.md
 ```
 
 ---
@@ -137,13 +114,3 @@ bisindo-gesture/
 6. **Cek sampel** — jika akurasi huruf tertentu rendah, tambahkan sampel baru
 
 ---
-
-## Troubleshooting
-
-|         Masalah         |                            Solusi                                  |
-|-------------------------|--------------------------------------------------------------------|
-| "Model tidak ditemukan" | Jalankan `collect_data.py` lalu `train_model.py` dulu              |
-| Akurasi rendah (<80%)   | Tambahkan lebih banyak sampel per huruf (200-300)                  |
-| Kamera tidak terdeteksi | Pastikan tidak dipakai aplikasi lain, coba restart                 |
-| TTS tidak bersuara      | Install `pyttsx3` (offline) atau pastikan koneksi internet (gTTS)  |
-| Gesture berkedip-kedip  | Ini normal untuk gesture yang mirip, model butuh lebih banyak data |
