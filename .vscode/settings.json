@@ -1,0 +1,7 @@
+// {
+//     "python.analysis.packageIndexDepths": [
+//         {"name": "cv2", "depth": 2},
+//         {"name": "mediapipe", "depth": 2}
+//     ],
+//     "python.analysis.extraPaths": ["./venv/Lib/site-packages"]
+// } 
