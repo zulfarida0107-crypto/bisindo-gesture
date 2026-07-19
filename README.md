@@ -32,15 +32,14 @@ Kamera → MediaPipe → Normalisasi → ML Model → Stabilizer → TTS + Teks
 
 ---
 
-## Huruf BISINDO
+### 1 Tangan (9 huruf statis + 1 dinamis)
+- **Statis:** C, E, I, L, O, R, U, V, Z
+- **Dinamis:** J (Dideteksi menggunakan gerakan nyata melengkung dari kelingking kiri via `JDetector`)
 
-### 1 Tangan (16 huruf)
-C, E, G, H, I, J, L, M, N, O, R, S, U, V, Y, Z
+### 2 Tangan (16 huruf statis)
+A, B, D, F, G, H, K, M, N, P, Q, S, T, W, X, Y
 
-### 2 Tangan (10 huruf)
-A, B, D, F, K, P, Q, T, W, X
-
-> **Catatan:** J dan Z adalah gesture dinamis (ada gerakan). Untuk v2.0, cukup tahan posisi akhir gesture saat merekam data.
+> **Catatan:** Untuk huruf statis, cukup tahan posisi tangan saat merekam. Khusus huruf **J**, sistem melacak lintasan gerakan secara dinamis sehingga tidak memerlukan rekam data gambar statis.
 
 ---
 
