@@ -17,7 +17,11 @@ import sys
 
 from gesture_classifier import GestureClassifier
 from stabilizer import GestureStabilizer
+from motion_tracker import JDetector
 from tts import speak
+
+# Simpan fungsi asli sebelum dirusak oleh monkey-patching ultralytics
+original_imshow = cv2.imshow
 
 # ═══════════════════════════════════════════════════════════════════
 #  INISIALISASI
@@ -63,6 +67,14 @@ stabilizer = GestureStabilizer(
     switch_threshold=3,
 )
 
+# 5. J Detector (gerakan kelingking kiri)
+j_detector = JDetector(
+    window_sec=1.2,
+    min_travel=0.04,
+    angle_threshold=40,
+)
+j_detected_flash = 0  # timestamp untuk flash UI saat J terdeteksi
+
 print("\n  Sistem BISINDO Aktif!")
 print("  Kontrol: SPACE=spasi | BACKSPACE=hapus | ENTER=baca | R=reset | ESC=keluar")
 print("=" * 55 + "\n")
@@ -78,7 +90,7 @@ current_confidence = 0.0       # confidence saat ini
 last_add_time = time.time()    # waktu terakhir huruf ditambahkan
 
 # Timeout: jika tidak ada gesture selama N detik → TTS baca teks
-NO_GESTURE_TIMEOUT = 2.0       # detik
+NO_GESTURE_TIMEOUT = 5.0       # detik
 last_gesture_time = time.time()
 text_spoken = False            # apakah teks sudah dibaca
 
@@ -90,39 +102,30 @@ fps = 0
 #  HELPER FUNCTIONS
 # ═══════════════════════════════════════════════════════════════════
 
-
 def get_display_text():
     """Gabungkan accumulated_text menjadi string untuk display."""
     return "".join(accumulated_text) if accumulated_text else ""
 
-
 def draw_confidence_bar(frame, x, y, width, height, confidence, label=""):
     """Gambar bar confidence dengan warna gradient."""
-    # Background bar
     cv2.rectangle(frame, (x, y), (x + width, y + height), (50, 50, 50), -1)
-
-    # Filled bar berdasarkan confidence
     fill_w = int(width * confidence)
     if confidence >= 0.8:
-        color = (0, 220, 80)      # hijau = sangat yakin
+        color = (0, 220, 80)      # hijau
     elif confidence >= 0.6:
-        color = (0, 200, 255)     # kuning = cukup yakin
+        color = (0, 200, 255)     # kuning
     else:
-        color = (0, 80, 230)      # merah = kurang yakin
+        color = (0, 80, 230)      # merah
 
     cv2.rectangle(frame, (x, y), (x + fill_w, y + height), color, -1)
-
-    # Border
     cv2.rectangle(frame, (x, y), (x + width, y + height), (100, 100, 100), 1)
 
-    # Label
     if label:
         cv2.putText(
             frame, label,
             (x + 5, y + height - 5),
             cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1,
         )
-
 
 # ═══════════════════════════════════════════════════════════════════
 #  MAIN LOOP
@@ -150,7 +153,7 @@ while True:
             results.multi_hand_landmarks, results.multi_handedness
         ):
             label = hand_info.classification[0].label
-            # MediaPipe dengan mirror: "Left" = tangan kiri user, "Right" = kanan user
+            # Simpan sesuai format model (MediaPipe raw)
             if label == "Left":
                 left_hand = hand_lm
                 left_label_text = "ON"
@@ -164,6 +167,17 @@ while True:
                 mp_styles.get_default_hand_landmarks_style(),
                 mp_styles.get_default_hand_connections_style(),
             )
+
+    # ─── J Motion Detection (kelingking kiri) ───────────────────
+    j_motion = j_detector.update(left_hand)
+    if j_motion:
+        accumulated_text.append("J")
+        last_added_gesture = "J"
+        last_add_time = time.time()
+        last_gesture_time = time.time()
+        text_spoken = False
+        j_detected_flash = time.time()
+        print("  [MOTION] Huruf J terdeteksi!")
 
     # ─── ML Prediction ──────────────────────────────────────────
     raw_gesture = None
@@ -183,35 +197,27 @@ while True:
         last_gesture_time = time.time()
         text_spoken = False
 
-        # Tambahkan huruf jika berbeda dari yang terakhir ditambahkan
         if current_gesture != last_added_gesture:
             if current_gesture != "ON":
                 accumulated_text.append(current_gesture)
                 last_add_time = time.time()
             last_added_gesture = current_gesture
-        else:
-            # Jika huruf sama ditahan terus selama 1.5 detik, gandakan hurufnya (Auto-Repeat)
-            if current_gesture != "ON":
-                if time.time() - last_add_time > 1.5:
-                    accumulated_text.append(current_gesture)
-                    last_add_time = time.time()
 
     else:
-        # current_gesture == "OFF" (tidak ada tangan)
         elapsed = time.time() - last_gesture_time
 
-        if accumulated_text and not text_spoken and elapsed >= NO_GESTURE_TIMEOUT:
-            final_text = get_display_text()
-            if final_text.strip():
-                print(f"  TTS: \"{final_text}\"")
-                speak(final_text)
-            text_spoken = True
-
-        # Jika tangan hilang ("OFF"), langsung reset penahan gesture
-        # Ini memungkinkan kamu mengetik huruf yang sama berturut-turut (misal 'A' lalu 'A')
-        # cukup dengan menyembunyikan tangan sesaat.
-        if current_gesture == "OFF":
-            last_added_gesture = "OFF"
+        if elapsed >= 5.0:
+            if accumulated_text and not text_spoken:
+                final_text = get_display_text()
+                if final_text.strip():
+                    print(f"  TTS (Auto-Enter): \"{final_text}\"")
+                    speak(final_text)
+                accumulated_text.clear()
+                text_spoken = True
+            last_added_gesture = None
+        else:
+            if elapsed > 1.5:
+                last_added_gesture = None
 
     # ─── FPS ────────────────────────────────────────────────────
     now = time.time()
@@ -222,21 +228,19 @@ while True:
     #  UI OVERLAY
     # ═══════════════════════════════════════════════════════════════
 
-    # --- Header background ---
     cv2.rectangle(frame, (0, 0), (w, 160), (20, 20, 20), -1)
 
-    # --- Hand Status ---
-    r_color = (0, 230, 80) if right_label_text == "ON" else (80, 80, 80)
-    l_color = (0, 230, 80) if left_label_text == "ON" else (80, 80, 80)
+    # Balik label teks pada UI agar sesuai tangan fisik user
+    r_color = (0, 230, 80) if left_label_text == "ON" else (80, 80, 80) # physical Right
+    l_color = (0, 230, 80) if right_label_text == "ON" else (80, 80, 80) # physical Left
 
-    cv2.putText(frame, f"Kanan: {right_label_text}",
+    cv2.putText(frame, f"Kanan: {left_label_text}",
                 (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.65, r_color, 2)
-    cv2.putText(frame, f"Kiri: {left_label_text}",
+    cv2.putText(frame, f"Kiri: {right_label_text}",
                 (200, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.65, l_color, 2)
     cv2.putText(frame, f"FPS: {int(fps)}",
                 (w - 120, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (150, 150, 150), 1)
 
-    # --- Current Gesture (besar di tengah header) ---
     gesture_display = current_gesture if current_gesture else "-"
     conf_display = f"{raw_confidence:.0%}" if raw_gesture else "0%"
 
@@ -245,16 +249,17 @@ while True:
     cv2.putText(frame, gesture_display,
                 (160, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 3)
 
-    # --- Confidence Bar ---
     draw_confidence_bar(frame, 20, 100, 300, 18, raw_confidence,
                         f"Confidence: {conf_display}")
 
-    # --- Raw prediction (debug) ---
     raw_display = f"Raw: {raw_gesture} ({raw_confidence:.2f})" if raw_gesture else "Raw: -"
     cv2.putText(frame, raw_display,
                 (20, 145), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (120, 120, 120), 1)
 
-    # --- Footer: Accumulated Text ---
+    if time.time() - j_detected_flash < 1.0:
+        cv2.putText(frame, "[J] TERDETEKSI!",
+                    (400, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 180), 2)
+
     footer_y = h - 100
     cv2.rectangle(frame, (0, footer_y), (w, h), (20, 20, 20), -1)
 
@@ -263,7 +268,6 @@ while True:
 
     display_text = get_display_text()
     if display_text:
-        # Potong jika terlalu panjang
         max_chars = w // 30
         if len(display_text) > max_chars:
             display_text = "..." + display_text[-(max_chars - 3):]
@@ -273,20 +277,16 @@ while True:
         cv2.putText(frame, "-",
                     (20, footer_y + 75), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (80, 80, 80), 3)
 
-    # --- Status TTS ---
     if text_spoken and accumulated_text:
         cv2.putText(frame, "[TTS Selesai]",
                     (w - 200, footer_y + 30), cv2.FONT_HERSHEY_SIMPLEX,
                     0.6, (0, 200, 100), 2)
 
-    # --- Kontrol hint ---
     cv2.putText(frame, "SPACE=spasi  BACKSPACE=hapus  ENTER=baca  R=reset  ESC=keluar",
                 (20, h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (100, 100, 100), 1)
 
-    # ═══════════════════════════════════════════════════════════════
-    #  TAMPILKAN FRAME
-    # ═══════════════════════════════════════════════════════════════
-    cv2.imshow("BISINDO Translator v2.0", frame)
+    # Tampilkan frame menggunakan original_imshow untuk membypass monkey-patching ultralytics
+    original_imshow("BISINDO Translator v2.0", frame)
 
     # ═══════════════════════════════════════════════════════════════
     #  KEYBOARD INPUT
@@ -296,32 +296,37 @@ while True:
     if key == 27:  # ESC
         break
 
-    elif key == ord(' '):  # SPACE → tambah spasi
+    elif key == ord(' '):
         accumulated_text.append(" ")
         text_spoken = False
         print("  [SPACE] Spasi ditambahkan")
 
-    elif key == 8 or key == 127:  # BACKSPACE → hapus karakter terakhir
+    elif key == 8 or key == 127:
         if accumulated_text:
             removed = accumulated_text.pop()
             print(f"  [BACKSPACE] Dihapus: '{removed}'")
             text_spoken = False
 
-    elif key == 13:  # ENTER → baca teks sekarang
+    elif key == 13:
         text = get_display_text()
         if text.strip():
             print(f"  [ENTER] TTS: \"{text}\"")
             speak(text)
             text_spoken = True
 
-    elif key == ord('r') or key == ord('R'):  # R → reset semua
+    elif key == ord('j') or key == ord('J'):
+        accumulated_text.append("J")
+        last_added_gesture = "J"
+        text_spoken = False
+        print("  [MANUAL] Huruf J ditambahkan")
+
+    elif key == ord('r') or key == ord('R'):
         accumulated_text.clear()
         last_added_gesture = None
         current_gesture = None
         text_spoken = False
         stabilizer.reset()
         print("  [RESET] Teks direset")
-
 
 # ═══════════════════════════════════════════════════════════════════
 #  CLEANUP

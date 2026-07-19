@@ -15,15 +15,22 @@ import sys
 
 # ─── Konfigurasi ────────────────────────────────────────────────
 DATASET_DIR = "dataset"          # folder output CSV
-SAMPLES_TARGET = 150             # target sampel per gesture
+SAMPLES_TARGET = 50              # target sampel per gesture
 COUNTDOWN_SEC = 3                # hitungan mundur sebelum rekam
 # ────────────────────────────────────────────────────────────────
 
-# Semua huruf BISINDO (sesuai gambar) + ON dan OFF
+# Semua huruf BISINDO + ON dan OFF
 BISINDO_LABELS = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ") + ["ON", "OFF"]
 
-# Huruf yang butuh 2 tangan (referensi dari gambar BISINDO)
-TWO_HAND_LETTERS = {"A", "B", "D", "F", "K", "P", "Q", "S", "T", "W", "X", "Y"}
+# ── Kategorisasi tangan per huruf BISINDO ───────────────────────
+# 1 tangan kiri saja
+ONE_HAND_LEFT_LETTERS = {"C", "E", "I", "L", "O", "R", "U", "V", "Z"}
+
+# 2 tangan (kiri + kanan)
+TWO_HAND_LETTERS = {"A", "B", "D", "F", "G", "H", "K", "M", "N", "P", "Q", "S", "T", "W", "X", "Y"}
+
+# Gesture dinamis — belum didukung di versi ini (butuh motion tracker)
+DYNAMIC_LETTERS  = {"J"}  # gerakan 0° → 90°
 
 mp_hands = mp.solutions.hands
 mp_draw  = mp.solutions.drawing_utils
@@ -81,10 +88,25 @@ def count_existing_samples(label):
 def collect_gesture(label):
     """Buka kamera dan rekam sampel untuk satu gesture/huruf."""
 
-    is_two_hand = label in TWO_HAND_LETTERS
-    hand_mode   = "2 TANGAN" if is_two_hand else "1 TANGAN"
+    is_two_hand  = label in TWO_HAND_LETTERS
+    is_left_only = label in ONE_HAND_LEFT_LETTERS
+    is_dynamic   = label in DYNAMIC_LETTERS
+
+    if is_two_hand:
+        hand_mode = "2 TANGAN"
+    elif is_dynamic:
+        hand_mode = "DINAMIS (belum didukung)"
+    else:
+        hand_mode = "1 TANGAN KIRI"
+
     csv_path    = get_csv_path(label)
     existing    = count_existing_samples(label)
+
+    # Skip huruf dinamis — belum ada implementasi motion tracker
+    if is_dynamic:
+        print(f"\n  ⚠️  Huruf {label} adalah gesture DINAMIS (pergerakan 0°→90°)")
+        print(f"      Belum didukung di versi ini. Di-skip otomatis.")
+        return 0
 
     print(f"\n{'='*50}")
     print(f"  Huruf : {label}  ({hand_mode})")
@@ -131,11 +153,12 @@ def collect_gesture(label):
                     results.multi_hand_landmarks, results.multi_handedness
                 ):
                     label_hand = hand_info.classification[0].label
-                    # MediaPipe: "Left"/"Right" sudah di-flip karena mirror
-                    if label_hand == "Right":
-                        right_row = get_landmarks_flat(hand_lm)
+                    # MediaPipe "Left" hand -> Physical LEFT hand
+                    # MediaPipe "Right" hand -> Physical RIGHT hand
+                    if label_hand == "Left":
+                        left_row = get_landmarks_flat(hand_lm)
                     else:
-                        left_row  = get_landmarks_flat(hand_lm)
+                        right_row = get_landmarks_flat(hand_lm)
 
                     mp_draw.draw_landmarks(
                         frame, hand_lm, mp_hands.HAND_CONNECTIONS
@@ -150,14 +173,16 @@ def collect_gesture(label):
             # ── Cek apakah tangan cukup terdeteksi ──────────────
             if label == "OFF":
                 hand_ok = (left_row is None and right_row is None)
-                hint = "Sembunyikan tangan dari kamera"
+                hint    = "Sembunyikan tangan dari kamera"
             elif label == "ON":
-                # Mengubah menjadi wajib DUA TANGAN sesuai permintaanmu
                 hand_ok = (left_row is not None and right_row is not None)
-                hint = "Tunjukkan KEDUA tangan (pose istirahat)"
+                hint    = "Tunjukkan KEDUA tangan (pose istirahat)"
             elif is_two_hand:
                 hand_ok = (left_row is not None and right_row is not None)
-                hint    = "Tunjukkan KEDUA tangan"
+                hint    = "Tunjukkan KEDUA tangan (kiri + kanan)"
+            elif is_left_only:
+                hand_ok = (left_row is not None)
+                hint    = "Tunjukkan tangan KIRI saja"
             else:
                 hand_ok = (right_row is not None or left_row is not None)
                 hint    = "Tunjukkan SATU tangan"
