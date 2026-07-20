@@ -1,4 +1,4 @@
-# 🤟 BISINDO Gesture Recognition
+# BISINDO Gesture Recognition
 > Sistem Penerjemah Alfabet Bahasa Isyarat Indonesia (BISINDO) Berbasis Computer Vision & Machine Learning.
 
 [![Python Version](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11-blue.svg)](https://www.python.org/)
@@ -14,7 +14,7 @@ Kamera → MediaPipe → Normalisasi → ML Model → Stabilizer → TTS + Teks
             × 3 coord    wrist)        Forest)     filtering)
             per tangan)
 
-## 🚀 Fitur Utama
+## Fitur Utama
 1. **Klasifikasi 26 Huruf BISINDO Lengkap (A–Z):** Mendukung gesture satu tangan maupun dua tangan sesuai kaidah BISINDO asli (GERKATIN & LINKSOS).
 2. **Model Machine Learning Ensemble:** Menggabungkan kekuatan **Random Forest (300 estimator)** dan **Support Vector Machine (SVM RBF)** menggunakan metode *Soft Voting* untuk akurasi klasifikasi yang tangguh.
 3. **Representasi Fitur 156 Dimensi:** Kombinasi 126 koordinat landmark tangan 3D yang dinormalisasi (*scale & position invariant*) dan 30 fitur sudut sendi jari untuk membedakan huruf dengan gesture mirip (seperti A, T, dan X).
@@ -23,7 +23,7 @@ Kamera → MediaPipe → Normalisasi → ML Model → Stabilizer → TTS + Teks
 6. **Engine TTS Windows SAPI:** Menggunakan API suara internal Windows via PowerShell, memberikan ketahanan tinggi untuk pemanggilan suara berulang kali tanpa risiko *crash* atau *freezing*.
 
 
-## 💻 Teknologi yang Digunakan (Tech Stack)
+## Teknologi yang Digunakan (Tech Stack)
 
 Aplikasi ini dibangun menggunakan kombinasi pustaka pemrosesan citra (*computer vision*), analisis data, dan kecerdasan buatan berikut:
 
@@ -38,7 +38,7 @@ Aplikasi ini dibangun menggunakan kombinasi pustaka pemrosesan citra (*computer 
 | **gTTS & Pygame** | Pustaka *Text-to-Speech* daring (*Google Translate API*) bersama pemutar audio *Pygame* sebagai alternatif cadangan (*fallback*) untuk platform non-Windows. |
 
 
-## 🛠️ Persiapan & Instalasi
+## Persiapan & Instalasi
 
 ### 1. Inisialisasi Environment
 Direkomendasikan menggunakan Python 3.9 s.d 3.11. Buka terminal atau PowerShell pada direktori proyek:
@@ -61,7 +61,7 @@ pip install gTTS pygame pyttsx3
 
 ---
 
-## 📖 Panduan Alur Kerja (Workflow)
+## Panduan Alur Kerja (Workflow)
 
 ### Langkah 1: Pengumpulan Dataset Landmark
 Jika Anda ingin merekam data gesture Anda sendiri atau melengkapi data yang kurang:
