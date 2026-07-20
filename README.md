@@ -8,17 +8,11 @@
 
 Sistem ini dirancang untuk menjembatani komunikasi antara teman-teman Tuli dan masyarakat dengar dengan menerjemahkan gesture alfabet Bahasa Isyarat Indonesia (BISINDO) secara langsung (*real-time*) menjadi teks dan suara (*Text-to-Speech*).
 
----
-
-## 📹 Video Demonstrasi Real-Time
-Berikut adalah rekaman demonstrasi langsung dari sistem saat dijalankan (*raw screen record* tanpa edit):
-
-👉 **[Tonton Video Demo Aplikasi (video-dokumentasi-bisindo.mp4)](./video-dokumentasi-bisindo.mp4)**
-
-*(Tips: Rekam layar Anda saat menjalankan program, simpan hasilnya dengan nama `video-dokumentasi-bisindo.mp4` di folder utama proyek agar tautan di atas otomatis terhubung secara lokal).*
-
----
-
+## Arsitektur Sistem
+Kamera → MediaPipe → Normalisasi → ML Model → Stabilizer → TTS + Teks
+ (OpenCV)  (21 titik    (relatif ke    (Random    (confidence    (output)
+            × 3 coord    wrist)        Forest)     filtering)
+            per tangan)
 
 ## 🚀 Fitur Utama
 1. **Klasifikasi 26 Huruf BISINDO Lengkap (A–Z):** Mendukung gesture satu tangan maupun dua tangan sesuai kaidah BISINDO asli (GERKATIN & LINKSOS).
@@ -28,7 +22,6 @@ Berikut adalah rekaman demonstrasi langsung dari sistem saat dijalankan (*raw sc
 5. **Dua Metode Deteksi Huruf J:** Melalui lintasan dinamis jari kelingking kiri (`JDetector`) atau menahan posisi huruf "I" selama 3 detik dengan indikator *timer* visual di layar.
 6. **Engine TTS Windows SAPI:** Menggunakan API suara internal Windows via PowerShell, memberikan ketahanan tinggi untuk pemanggilan suara berulang kali tanpa risiko *crash* atau *freezing*.
 
----
 
 ## 💻 Teknologi yang Digunakan (Tech Stack)
 
@@ -44,7 +37,6 @@ Aplikasi ini dibangun menggunakan kombinasi pustaka pemrosesan citra (*computer 
 | **Windows SAPI (`System.Speech`)** | Mesin suara utama (*Text-to-Speech*) berbasis sistem Windows (via *PowerShell subprocess*) yang bekerja secara *offline*, hemat memori, dan bebas *crash* saat dipanggil berulang kali. |
 | **gTTS & Pygame** | Pustaka *Text-to-Speech* daring (*Google Translate API*) bersama pemutar audio *Pygame* sebagai alternatif cadangan (*fallback*) untuk platform non-Windows. |
 
----
 
 ## 🛠️ Persiapan & Instalasi
 
@@ -96,65 +88,20 @@ Mulai aplikasi penerjemah real-time:
 python src/main.py
 ```
 
----
+**Kontrol keyboard:**
+|     Tombol    |           Fungsi         |
+|---------------|--------------------------|
+| **SPACE**     | Tambah spasi (kata baru) |
+| **BACKSPACE** | Hapus huruf terakhir     |
+| **ENTER**     | Baca teks sekarang (TTS) |
+| **R**         | Reset semua teks         |
+| **ESC**       | Keluar                   |
+**Otomatis:** Jika tangan dilepas selama 2 detik, TTS akan membaca teks yang sudah terkumpul.
 
-## ⌨️ Kontrol Keyboard & Antarmuka
-
-Aplikasi utama menyediakan visualisasi informasi di layar kamera serta kontrol keyboard interaktif:
-
-| Tombol | Fungsi Aksi |
-| :--- | :--- |
-| `SPACE` | Menyisipkan karakter spasi (pemisah kata). |
-| `BACKSPACE` | Menghapus satu huruf terakhir dari kalimat terjemahan. |
-| `ENTER` | Melafalkan kalimat terjemahan yang terkumpul menggunakan suara (TTS). |
-| `R` | Menghapus seluruh kalimat terjemahan di layar (Reset). |
-| `ESC` | Menghentikan aliran kamera dan menutup aplikasi dengan aman. |
-
-> 💡 **Auto-TTS:** Sistem secara otomatis melafalkan kalimat terjemahan jika kamera tidak mendeteksi tangan apa pun selama 5 detik berturut-turut.
-
----
-
-## 📂 Struktur Direktori Proyek
-
-```
-bisindo-gesture/
-├── dataset/                   # Dataset landmark tangan dalam bentuk berkas CSV
-│   ├── bisindo_A.csv
-│   ├── bisindo_B.csv
-│   └── ...
-├── src/                       # Source code utama aplikasi
-│   ├── main.py                # Loop aplikasi utama (real-time camera stream & UI)
-│   ├── gesture_classifier.py  # Pemuatan model & normalisasi landmark (156 fitur)
-│   ├── train_model.py         # Skrip augmentasi data & pelatihan model (RF + SVM)
-│   ├── motion_tracker.py      # JDetector untuk lacak lintasan dinamis kelingking kiri
-│   ├── stabilizer.py          # Modul anti-jitter (Voting stabilizer)
-│   ├── tts.py                 # Engine Text-to-Speech (Windows SAPI & fallback gTTS)
-│   └── gesture_model.pkl      # Model klasifikasi ensemble tersimpan (biner)
-├── PRDBisindoGesture.md       # Product Requirements Document (PRD)
-├── Workflow.md                # Dokumentasi alur kerja proyek lengkap
-└── README.md                  # Panduan ringkas penggunaan sistem 
-```
-
----
-
-## ⚙️ Pemecahan Masalah (Troubleshooting)
-
-### 1. Suara TTS Tidak Terdengar (Atau Hanya Berbunyi Sekali)
-* **Penyebab:** Driver COM `pyttsx3` sering mengalami kegagalan *state* pada OS Windows saat dipanggil berulang.
-* **Solusi:** Sistem saat ini menggunakan Windows SAPI via PowerShell. Pastikan PowerShell terpasang dan dapat dijalankan tanpa hambatan hak akses pada perangkat Anda.
-
-### 2. Huruf Tertentu Sulit Terdeteksi atau Sering Tertukar
-* **Penyebab:** Sudut tangan saat berpose di depan kamera berbeda dengan sudut saat data direkam.
-* **Solusi:** Lakukan perekaman tambahan untuk huruf tersebut menggunakan `collect_data.py` (Opsi 2). Variasikan jarak tangan, sudut kemiringan, dan pencahayaan sewaktu merekam. Kemudian jalankan `train_model.py` kembali.
-
-### 3. Error `AttributeError` atau `ModuleNotFound` pada MediaPipe
-* **Penyebab:** Python menggunakan *environment* global atau terjadi konflik versi library.
-* **Solusi:** Selalu jalankan skrip melalui virtual environment yang telah diaktivasi (`.\venv\Scripts\Activate.ps1`).
-
----
-
-## 📚 Referensi & Media Visual
-* **Panduan Gesture BISINDO:** Gambar panduan dan poster media visual alfabet isyarat diperoleh dari [Vektor Premium Alfabet Bahasa Isyarat BISINDO - Magnific Indonesia](https://www.magnific.com/idn/vektor-premium/alfabet-bahasa-isyarat-bisindo-jari-manusia_402829456.htm).
-
----
-*Dikembangkan dengan penuh dedikasi untuk mendukung inklusivitas komunikasi teman-teman Tuli di Indonesia.* 🤟
+## Tips Pengumpulan Data
+1. **Pencahayaan** — pastikan ruangan terang dan merata
+2. **Latar belakang** — gunakan latar polos (bukan ramai)
+3. **Variasi** — geser tangan sedikit (atas/bawah/kiri/kanan) saat merekam agar model lebih robust
+4. **Jarak** — variasikan jarak tangan ke kamera (dekat dan jauh)
+5. **Kedua tangan** — untuk huruf 2 tangan, pastikan **kedua** tangan terlihat
+6. **Cek sampel** — jika akurasi huruf tertentu rendah, tambahkan sampel baru
