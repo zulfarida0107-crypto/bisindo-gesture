@@ -14,6 +14,11 @@ import cv2
 import mediapipe as mp
 import time
 import sys
+import warnings
+
+# Suppress google.protobuf deprecation warnings yang banjiri terminal
+warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf")
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 from gesture_classifier import GestureClassifier
 from stabilizer import GestureStabilizer
@@ -98,6 +103,14 @@ text_spoken = False            # apakah teks sudah dibaca
 fps_time = time.time()
 fps = 0
 
+# ─── State I → J Timer ──────────────────────────────────────────
+# Logika: huruf I dan J posturnya mirip.
+# Jika gesture "I" ditahan >= 3 detik → dicatat sebagai J.
+# Jika dilepas < 3 detik → dicatat sebagai I.
+I_HOLD_FOR_J   = 3.0      # detik tahan untuk jadi J
+i_hold_start   = None     # waktu mulai tahan pose I
+i_pending      = False    # apakah sedang menunggu konfirmasi I vs J
+
 # ═══════════════════════════════════════════════════════════════════
 #  HELPER FUNCTIONS
 # ═══════════════════════════════════════════════════════════════════
@@ -153,7 +166,7 @@ while True:
             results.multi_hand_landmarks, results.multi_handedness
         ):
             label = hand_info.classification[0].label
-            # Simpan sesuai format model (MediaPipe raw)
+            # Default MediaPipe mapping (swapped back)
             if label == "Left":
                 left_hand = hand_lm
                 left_label_text = "ON"
@@ -197,14 +210,56 @@ while True:
         last_gesture_time = time.time()
         text_spoken = False
 
-        if current_gesture != last_added_gesture:
-            if current_gesture != "ON":
+        if current_gesture == "I":
+            # ── Logika I vs J ────────────────────────────────────
+            # Saat gesture I pertama kali muncul, mulai timer
+            if not i_pending:
+                i_hold_start = time.time()
+                i_pending    = True
+                # Belum tambahkan ke teks — tunggu dulu
+            else:
+                held_duration = time.time() - i_hold_start
+                if held_duration >= I_HOLD_FOR_J:
+                    # Ditahan >= 3 detik → ini adalah J
+                    if last_added_gesture != "J":
+                        accumulated_text.append("J")
+                        last_added_gesture = "J"
+                        last_add_time = time.time()
+                        j_detected_flash = time.time()
+                        i_pending = False
+                        i_hold_start = None
+                        print("  [I→J] Pose I ditahan 3 detik → J")
+        else:
+            # Gesture berubah dari I ke gesture lain
+            if i_pending:
+                # I dilepas sebelum 3 detik → commit sebagai I
+                if last_added_gesture != "I":
+                    accumulated_text.append("I")
+                    last_added_gesture = "I"
+                    last_add_time = time.time()
+                    print("  [I] Pose I dilepas cepat → I")
+                i_pending    = False
+                i_hold_start = None
+
+            # Proses gesture selain I dan ON seperti biasa
+            if current_gesture != last_added_gesture and current_gesture != "ON":
                 accumulated_text.append(current_gesture)
                 last_add_time = time.time()
-            last_added_gesture = current_gesture
+                last_added_gesture = current_gesture
 
     else:
+        # Tidak ada gesture aktif
         elapsed = time.time() - last_gesture_time
+
+        # Jika pose I pending dan tangan diangkat → commit sebagai I
+        if i_pending:
+            if last_added_gesture != "I":
+                accumulated_text.append("I")
+                last_added_gesture = "I"
+                last_add_time = time.time()
+                print("  [I] Tangan dilepas saat pose I → I")
+            i_pending    = False
+            i_hold_start = None
 
         if elapsed >= 5.0:
             if accumulated_text and not text_spoken:
@@ -230,13 +285,12 @@ while True:
 
     cv2.rectangle(frame, (0, 0), (w, 160), (20, 20, 20), -1)
 
-    # Balik label teks pada UI agar sesuai tangan fisik user
-    r_color = (0, 230, 80) if left_label_text == "ON" else (80, 80, 80) # physical Right
-    l_color = (0, 230, 80) if right_label_text == "ON" else (80, 80, 80) # physical Left
+    r_color = (0, 230, 80) if right_label_text == "ON" else (80, 80, 80)
+    l_color = (0, 230, 80) if left_label_text == "ON" else (80, 80, 80)
 
-    cv2.putText(frame, f"Kanan: {left_label_text}",
+    cv2.putText(frame, f"Kanan: {right_label_text}",
                 (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.65, r_color, 2)
-    cv2.putText(frame, f"Kiri: {right_label_text}",
+    cv2.putText(frame, f"Kiri: {left_label_text}",
                 (200, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.65, l_color, 2)
     cv2.putText(frame, f"FPS: {int(fps)}",
                 (w - 120, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (150, 150, 150), 1)
@@ -259,6 +313,27 @@ while True:
     if time.time() - j_detected_flash < 1.0:
         cv2.putText(frame, "[J] TERDETEKSI!",
                     (400, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 180), 2)
+
+    # ── I → J Timer indicator ────────────────────────────────────
+    if i_pending and i_hold_start is not None:
+        held = time.time() - i_hold_start
+        progress = min(held / I_HOLD_FOR_J, 1.0)
+        bar_x, bar_y, bar_w, bar_h = 400, 60, 200, 20
+
+        # Latar bar
+        cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_w, bar_y + bar_h), (40, 40, 40), -1)
+        # Isi bar: kuning → hijau saat mendekati J
+        fill = int(bar_w * progress)
+        bar_color = (0, int(180 + 75 * progress), int(255 * (1 - progress)))
+        cv2.rectangle(frame, (bar_x, bar_y), (bar_x + fill, bar_y + bar_h), bar_color, -1)
+        cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_w, bar_y + bar_h), (150, 150, 150), 1)
+
+        sisa = max(0.0, I_HOLD_FOR_J - held)
+        label_ij = f"I  tahan {sisa:.1f}s  J" if sisa > 0 else "→ J!"
+        cv2.putText(frame, label_ij,
+                    (bar_x + 5, bar_y + bar_h - 4),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
 
     footer_y = h - 100
     cv2.rectangle(frame, (0, footer_y), (w, h), (20, 20, 20), -1)

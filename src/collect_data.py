@@ -15,7 +15,7 @@ import sys
 
 # ─── Konfigurasi ────────────────────────────────────────────────
 DATASET_DIR = "dataset"          # folder output CSV
-SAMPLES_TARGET = 50              # target sampel per gesture
+SAMPLES_TARGET = 80              # target sampel per gesture (lebih banyak = lebih akurat)
 COUNTDOWN_SEC = 3                # hitungan mundur sebelum rekam
 # ────────────────────────────────────────────────────────────────
 
@@ -99,52 +99,74 @@ def collect_gesture(label):
     else:
         hand_mode = "1 TANGAN KIRI"
 
-    csv_path    = get_csv_path(label)
-    existing    = count_existing_samples(label)
+    # Panduan spesifik per huruf BISINDO (bukan ASL!)
+    GESTURE_TIPS = {
+        "A": "2 TANGAN: ibu jari + telunjuk kedua tangan saling menyentuh, membentuk BERLIAN di atas.",
+        "B": "2 TANGAN: kedua telapak tangan menghadap ke depan, jari-jari rapat lurus ke atas.",
+        "D": "2 TANGAN: telunjuk kanan lurus ke atas, tangan kiri membentuk huruf C di sekitarnya.",
+        "F": "1 TANGAN: telunjuk satu-satunya yang menunjuk ke atas, ibu jari & jari lain melingkar.",
+        "T": "1 TANGAN: kepalan, ibu jari MENYELIP di celah antara telunjuk & jari tengah.",
+        "X": "2 TANGAN: jari-jari kedua tangan saling MENYILANG satu sama lain membentuk X.",
+        "K": "2 TANGAN: telunjuk kanan ke atas, tangan kiri menopang dari bawah.",
+        "S": "2 TANGAN: telapak tangan saling bertumpuk / bersilangan di depan dada.",
+        "G": "2 TANGAN: kedua tangan dalam posisi menunjuk, saling berhadapan.",
+        "H": "2 TANGAN: kedua telunjuk menunjuk ke samping, sejajar horizontal.",
+        "M": "1 TANGAN: semua jari terbuka lebar menghadap ke depan seperti kipas.",
+        "N": "2 TANGAN: tangan kanan mengepal kecil, tangan kiri menopang dari bawah.",
+        "P": "2 TANGAN: telunjuk kanan ke bawah, tangan kiri membentuk lingkaran.",
+        "Q": "2 TANGAN: kedua tangan membentuk lingkaran O yang saling berhadapan.",
+        "W": "2 TANGAN: kedua tangan saling bersilang di pergelangan tangan.",
+    }
 
-    # Skip huruf dinamis — belum ada implementasi motion tracker
-    if is_dynamic:
-        print(f"\n  ⚠️  Huruf {label} adalah gesture DINAMIS (pergerakan 0°→90°)")
-        print(f"      Belum didukung di versi ini. Di-skip otomatis.")
-        return 0
+    print(f"\n==================================================")
+    print(f" MEREKAM GESTURE: {label} [{hand_mode}]")
+    print(f"==================================================")
+    if label in GESTURE_TIPS:
+        print(f" ★ TIPS: {GESTURE_TIPS[label]}")
+    print(f" - Target: {SAMPLES_TARGET} sampel.")
+    print(f" - Tekan SPACE di kamera untuk memulai hitung mundur.")
+    print(f" - Tekan Q di kamera untuk selesai / lanjut.")
+    print(f"==================================================")
 
-    print(f"\n{'='*50}")
-    print(f"  Huruf : {label}  ({hand_mode})")
-    print(f"  Target: {SAMPLES_TARGET} sampel  |  Sudah ada: {existing}")
-    print(f"  Output: {csv_path}")
-    print(f"{'='*50}")
-    print("  Tekan  [SPACE] = mulai rekam")
-    print("  Tekan  [Q]     = selesai / lanjut huruf berikutnya")
-    print(f"{'='*50}\n")
-
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-
+    # Inisialisasi detektor MediaPipe Hands
     hands_detector = mp_hands.Hands(
         static_image_mode=False,
         max_num_hands=2,
         min_detection_confidence=0.7,
-        min_tracking_confidence=0.6,
+        min_tracking_confidence=0.6
     )
 
-    samples_collected = existing
-    recording         = False
-    countdown_start   = None
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
+    if not cap.isOpened():
+        print("Error: Kamera tidak dapat dibuka.")
+        return 0
+
+    samples_collected = count_existing_samples(label)
+    
+    # Buka file CSV untuk append
+    csv_path = get_csv_path(label)
     with open(csv_path, "a", newline="") as csv_file:
         writer = csv.writer(csv_file)
+
+        recording = False
+        countdown_start = None
 
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
 
-            frame   = cv2.flip(frame, 1)           # mirror
-            rgb     = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # Mirror frame agar natural saat user melihat ke layar
+            frame = cv2.flip(frame, 1)
+            h, w, _ = frame.shape
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            # Deteksi hands
             results = hands_detector.process(rgb)
 
-            # ── Deteksi tangan ──────────────────────────────────
             left_row  = None
             right_row = None
 
@@ -153,8 +175,7 @@ def collect_gesture(label):
                     results.multi_hand_landmarks, results.multi_handedness
                 ):
                     label_hand = hand_info.classification[0].label
-                    # MediaPipe "Left" hand -> Physical LEFT hand
-                    # MediaPipe "Right" hand -> Physical RIGHT hand
+                    # Default MediaPipe mapping (swapped back)
                     if label_hand == "Left":
                         left_row = get_landmarks_flat(hand_lm)
                     else:
@@ -225,8 +246,19 @@ def collect_gesture(label):
                         (20, 145), cv2.FONT_HERSHEY_SIMPLEX, 0.65, status_color, 2)
             cv2.putText(frame, "● REC" if recording else "○ PAUSE",
                         (20, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.7, rec_color, 2)
+
+            # Tampilkan tips di layar kamera jika ada
+            if label in GESTURE_TIPS:
+                tip_text = GESTURE_TIPS[label]
+                # Potong teks jika terlalu panjang
+                if len(tip_text) > 65:
+                    tip_text = tip_text[:62] + "..."
+                cv2.putText(frame, f"TIPS: {tip_text}",
+                            (20, 215), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 215, 255), 1)
+
             cv2.putText(frame, "SPACE=mulai  Q=selesai",
                         (20, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 200, 200), 1)
+
 
             if samples_collected >= SAMPLES_TARGET:
                 cv2.putText(frame, "TARGET TERCAPAI!",
@@ -291,28 +323,15 @@ def main():
         print("Pilihan tidak valid.")
         return
 
-    # ── Mulai koleksi ────────────────────────────────────────────
-    summary = {}
-    for i, lbl in enumerate(targets):
-        print(f"\n[{i+1}/{len(targets)}] Memulai huruf: {lbl}")
-        n = collect_gesture(lbl)
-        summary[lbl] = n
+    for label in targets:
+        # Huruf J dilewati karena dinamis
+        if label == "J":
+            print("\nHuruf J adalah gesture dinamis (dideteksi otomatis via motion tracker). Dilewati.")
+            continue
+        collect_gesture(label)
 
-        if i < len(targets) - 1:
-            next_lbl = targets[i + 1]
-            print(f"\nHuruf berikutnya: {next_lbl}")
-            input("Tekan Enter kalau sudah siap, atau Ctrl+C untuk stop...")
-
-    # ── Ringkasan akhir ──────────────────────────────────────────
-    print("\n" + "="*50)
-    print("  RINGKASAN KOLEKSI DATA")
-    print("="*50)
-    for lbl, n in summary.items():
-        status = "OK" if n >= SAMPLES_TARGET else f"KURANG ({SAMPLES_TARGET - n} lagi)"
-        print(f"  Huruf {lbl}: {n:>4} sampel  —  {status}")
-    print("="*50)
-    print(f"\nSemua CSV tersimpan di folder: ./{DATASET_DIR}/")
-    sys.exit(0)
+    print("\nProses selesai. Silakan jalankan training model dengan:")
+    print("  python src/train_model.py")
 
 
 if __name__ == "__main__":

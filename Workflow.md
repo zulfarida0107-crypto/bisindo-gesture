@@ -1,493 +1,197 @@
-# 🔄 Workflow — BISINDO Gesture Recognition System
+# 🔄 Dokumen Alur Kerja (Workflow)
+# BISINDO Gesture Recognition System
 
-> **Versi Dokumen:** 1.0  
-> **Tanggal:** 19 Juli 2026  
-> **Berdasarkan:** PRDBisindoGesture.md v1.0  
-> **Status Proyek:** 🟡 In Progress (±75%)
 
 ---
 
-## Gambaran Umum Workflow
+## 1. Pendahuluan
 
-Proyek ini memiliki **3 workflow utama** yang berjalan secara bertahap:
+Dokumen ini memuat panduan langkah demi langkah (*standard operating procedure*) dalam mempersiapkan, mengumpulkan data, melatih model, menjalankan, serta memelihara sistem klasifikasi isyarat BISINDO. Alur kerja dibagi menjadi empat tahapan utama:
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                   WORKFLOW BISINDO GESTURE                       │
-├──────────────────┬───────────────────┬───────────────────────────┤
-│  WF-1            │  WF-2             │  WF-3                     │
-│  SETUP &         │  DATA &           │  OPERASIONAL              │
-│  ENVIRONMENT     │  TRAINING         │  (Penggunaan Harian)      │
-│                  │                   │                           │
-│  Dilakukan       │  Dilakukan        │  Dilakukan setiap         │
-│  sekali saja     │  per sesi rekam   │  kali mau pakai           │
-└──────────────────┴───────────────────┴───────────────────────────┘
+┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
+│     WF-1        │      │     WF-2        │      │     WF-3        │      │     WF-4        │
+│    Setup &      │───▶  │  Pengumpulan    │───▶  │ Latihan Model & │───▶  │  Operasional    │
+│  Environment    │      │ Data Landmark   │      │   Evaluasi ML   │      │    Aplikasi     │
+└─────────────────┘      └─────────────────┘      └─────────────────┘      └─────────────────┘
 ```
 
 ---
 
-## WF-1 · Setup & Environment
+## 2. WF-1 · Setup & Environment
 
-> **Kapan:** Pertama kali clone/download project  
-> **Dilakukan:** Sekali saja
+Tahap instalasi dependensi dan penyiapan lingkungan kerja terisolasi (*virtual environment*). Dilakukan sekali saja saat pertama kali memasang aplikasi.
 
 ```
-[START]
+[Mulai]
    │
    ▼
-┌─────────────────────────────────────┐
-│  1. Clone / download project        │
-│     bisindo-gesture/                │
-└──────────────────┬──────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────┐
-│  2. Buat Virtual Environment        │
-│                                     │
-│  python -m venv venv                │
-└──────────────────┬──────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────┐
-│  3. Aktivasi Virtual Environment    │
-│                                     │
-│  .\venv\Scripts\Activate.ps1        │
-└──────────────────┬──────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────┐
-│  4. Install Dependencies            │
-│                                     │
-│  pip install opencv-python          │
-│              mediapipe==0.10.14     │
-│              scikit-learn           │
-│              numpy                  │
-│              gtts pygame            │
-│              pyttsx3                │
-└──────────────────┬──────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────┐
-│  5. Verifikasi Instalasi            │
-│                                     │
-│  python -c "import mediapipe,       │
-│  cv2, sklearn; print('OK')"         │
-└──────────────────┬──────────────────┘
-                   │
-                   ▼
-                [SELESAI]
-            Lanjut ke WF-2
+┌──────────────────────────────────────────────┐
+│ 1. Buat Lingkungan Virtual (Virtual Env)     │
+│    python -m venv venv                       │
+└──────────────────────┬───────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────┐
+│ 2. Aktivasi Virtual Environment              │
+│    .\venv\Scripts\Activate.ps1               │
+└──────────────────────┬───────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────┐
+│ 3. Pemasangan Pustaka Dependensi (Pip)       │
+│    pip install opencv-python mediapipe numpy │
+│    pip install scikit-learn gTTS pygame      │
+└──────────────────────┬───────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────┐
+│ 4. Pengujian Akses Kamera dan MediaPipe      │
+│    python -c "import cv2, mediapipe, sklearn;│
+│    print('Setup Berhasil')"                  │
+└──────────────────────┬───────────────────────┘
+                       │
+                       ▼
+                   [Selesai]
 ```
 
-### Checklist Setup
-
-- [ ] Python 3.9+ terinstall
-- [ ] Folder `venv/` berhasil dibuat
-- [ ] Semua package terinstall tanpa error
-- [ ] `import mediapipe` berhasil (tidak ada AttributeError)
-- [ ] Kamera terdeteksi (`python src/camera_test.py`)
+### Checklist Verifikasi Setup
+- [x] Python terpasang (versi yang didukung: 3.9 s.d 3.11).
+- [x] Folder `venv/` berhasil dibuat pada root direktori proyek.
+- [x] Modul MediaPipe terpasang dengan versi yang tepat (bebas dari error `protobuf` / `AttributeError`).
+- [x] Sistem operasi memiliki hak akses penuh untuk mengeksekusi skrip PowerShell (untuk TTS Windows SAPI).
 
 ---
 
-## WF-2 · Data Collection & Model Training
+## 3. WF-2 · Pengumpulan Data Landmark (`collect_data.py`)
 
-> **Kapan:** Pertama kali, atau saat menambah huruf baru  
-> **Status saat ini:** A–F ✅ sudah ada · G–Z 🔴 belum
-
-### WF-2A · Pengumpulan Data (`collect_data.py`)
+Prosedur pengumpulan sampel koordinat titik sendi tangan menggunakan MediaPipe Hands. Koordinat X, Y, Z dari 21 landmark per tangan direkam ke dalam berkas CSV.
 
 ```
-[START]
+[Mulai]
    │
    ▼
-┌─────────────────────────────────────────┐
-│  1. Aktifkan venv                       │
-│     .\venv\Scripts\Activate.ps1         │
-└──────────────────┬──────────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────────┐
-│  2. Jalankan script koleksi data        │
-│     python src/collect_data.py          │
-└──────────────────┬──────────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────────┐
-│  3. Pilih mode koleksi                  │
-│                                         │
-│  [1] Semua huruf A–Z (dari awal)        │
-│  [2] Huruf tertentu saja                │
-│  [3] Lanjutkan yang belum cukup ← Ini  │
-│  [4] Kumpulkan kelas ON dan OFF         │
-└──────────────────┬──────────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────────┐
-│  4. Per huruf — lakukan ini:            │
-│                                         │
-│  a) Siapkan pose tangan (lihat ref)     │
-│  b) Tekan [SPACE] → countdown 3 detik  │
-│  c) Tahan pose → rekam 150 sampel       │
-│  d) Tekan [Q] → lanjut huruf berikut   │
-└──────────────────┬──────────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────────┐
-│  5. Cek hasil di folder dataset/        │
-│                                         │
-│  dataset/bisindo_G.csv  ← baru          │
-│  dataset/bisindo_H.csv  ← baru          │
-│  dst...                                 │
-└──────────────────┬──────────────────────┘
-                   │
-                   ▼
-            Lanjut ke WF-2B
+┌──────────────────────────────────────────────┐
+│ 1. Jalankan Skrip Koleksi                    │
+│    python src/collect_data.py                │
+└──────────────────────┬───────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────┐
+│ 2. Tentukan Mode Perekaman                   │
+│    [1] Rekam seluruh A-Z dari awal           │
+│    [2] Rekam huruf spesifik (misal: ADFTX)   │
+│    [3] Lanjutkan yang belum memenuhi target  │
+└──────────────────────┬───────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────┐
+│ 3. Proses Perekaman Per Huruf                │
+│    a) Posisikan tangan sesuai kaidah BISINDO  │
+│    b) Tekan [SPACE] untuk mulai hitung mundur │
+│    c) Tahan posisi hingga 80-150 sampel      │
+│    d) Tekan [Q] untuk beralih ke huruf lain  │
+└──────────────────────┬───────────────────────┘
+                       │
+                       ▼
+                   [Selesai]
 ```
 
-#### Tips Rekam Data (dari PRD §7.2)
-
-| Tips | Detail |
-|------|--------|
-| 💡 **Pencahayaan** | Ruangan terang dan merata |
-| 🎭 **Latar belakang** | Gunakan latar polos (bukan ramai) |
-| ↔️ **Variasi posisi** | Geser tangan sedikit saat merekam |
-| 📏 **Variasi jarak** | Dekat dan jauh ke kamera |
-| 🤲 **2 tangan** | Untuk huruf A, B, D, F, K, P, Q, T, W, X — pastikan keduanya terlihat |
-
-#### Target Sampel Per Huruf
-
-| Kondisi | Sampel | Estimasi Waktu |
-|---------|--------|----------------|
-| Minimal (cukup jalan) | 50 sampel | ~1–2 mnt/huruf |
-| Standar (direkomendasikan) | 150 sampel | ~3–5 mnt/huruf |
-| Optimal (akurasi tinggi) | 200–300 sampel | ~5–10 mnt/huruf |
+### Panduan Teknis Perekaman yang Efektif
+1. **Posisi Tangan:** Untuk huruf dua tangan (seperti A, B, D, F, K, P, Q, T, W, X), pastikan kedua tangan terdeteksi oleh sistem di layar (indikator status: `Kanan: ON` & `Kiri: ON`) sebelum menekan tombol rekam.
+2. **Variasi Sudut:** Selama proses perekaman sampel (kemajuan bar berjalan), gerakkan tangan sedikit mendekat/menjauh dari kamera, serta miringkan sudut tangan beberapa derajat agar variasi data terekam dengan baik.
+3. **Pencahayaan:** Hindari pencahayaan dari belakang (*backlight*) yang dapat mengganggu estimasi kedalaman landmark oleh MediaPipe.
 
 ---
 
-### WF-2B · Pelatihan Model (`train_model.py`)
+## 4. WF-3 · Latihan Model & Evaluasi (`train_model.py`)
+
+Tahap melatih kecerdasan buatan (*Machine Learning*) untuk memetakan landmark tangan menjadi huruf alfabet BISINDO.
+
+### Detail Proses Training di Memori
+1. **Pemuatan Berkas:** Skrip memuat seluruh berkas koordinat `.csv` dari direktori `dataset/`.
+2. **Augmentasi Data:** Untuk setiap sampel, sistem membuat variasi buatan sebanyak 5 kali lipat (mengubah kemiringan $\pm15^\circ$, skala $\pm10\%$, dan perturbasi noise) guna meningkatkan ketahanan model.
+3. **Ekstraksi Fitur Sudut Sendi:** Menghitung 30 sudut sendi jari krusial guna memperkuat pemisahan bentuk gesture yang serupa.
+4. **Pelatihan Model Ensemble:** Melatih algoritma gabungan Random Forest (300 pepohonan keputusan) dan Support Vector Machine (SVM) dengan pembobotan seimbang (*balanced class weight*).
+5. **Ekspor Model:** Menyimpan file model biner final ke `src/gesture_model.pkl`.
 
 ```
-[START — setelah dataset tersedia]
+[Mulai]
    │
    ▼
-┌─────────────────────────────────────────┐
-│  1. Pastikan venv aktif                 │
-│     .\venv\Scripts\Activate.ps1         │
-└──────────────────┬──────────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────────┐
-│  2. Jalankan training                   │
-│     python src/train_model.py           │
-│                                         │
-│     Proses otomatis:                    │
-│     - Baca semua CSV di dataset/        │
-│     - Gabungkan menjadi satu dataset    │
-│     - Split train/test (80/20)          │
-│     - Latih Random Forest (200 trees)   │
-│     - Simpan model ke gesture_model.pkl │
-└──────────────────┬──────────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────────┐
-│  3. Evaluasi hasil training             │
-│                                         │
-│  Cek output di terminal:                │
-│  - Akurasi keseluruhan                  │
-│  - Akurasi per huruf (precision/recall) │
-│  - Confusion matrix                     │
-└──────────────────┬──────────────────────┘
-                   │
-            ┌──────┴──────┐
-            │             │
-            ▼             ▼
-    [Akurasi ≥ 85%]  [Akurasi < 85%]
-            │             │
-            ▼             ▼
-       Lanjut ke     Kembali ke WF-2A
-         WF-3        Tambah sampel untuk
-                     huruf yang akurasinya
-                     rendah
+┌──────────────────────────────────────────────┐
+│ 1. Eksekusi Pelatihan                        │
+│    python src/train_model.py                 │
+└──────────────────────┬───────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────┐
+│ 2. Evaluasi Metrik                           │
+│    Periksa laporan presisi (Precision),      │
+│    sensitivitas (Recall), dan F1-Score       │
+└──────────────────────┬───────────────────────┘
+                       │
+                       ▼
+            Lolos Uji Akurasi?
+            ├── Ya  ──▶ Simpan src/gesture_model.pkl (Selesai)
+            └── Tidak ─▶ Kembali ke WF-2 (Tambah sampel huruf bermasalah)
 ```
-
-#### Output Training
-
-| File | Lokasi | Keterangan |
-|------|--------|------------|
-| `gesture_model.pkl` | `src/gesture_model.pkl` | Model siap pakai (~735 KB) |
-
-#### Target Performa (dari PRD §5.1)
-
-| Metrik | Target |
-|--------|--------|
-| Akurasi per huruf | ≥ 85% |
-| Waktu training | < 60 detik |
 
 ---
 
-## WF-3 · Operasional (Penggunaan Harian)
+## 5. WF-4 · Operasional Aplikasi Utama (`main.py`)
 
-> **Kapan:** Setiap kali ingin menggunakan aplikasi  
-> **Prasyarat:** WF-1 & WF-2 sudah selesai, model sudah ada
+Prosedur penggunaan aplikasi sehari-hari untuk menerjemahkan gerakan menjadi teks dan suara secara *real-time*.
 
 ```
-[START]
+[Mulai]
    │
    ▼
-┌─────────────────────────────────────────┐
-│  1. Buka Terminal / PowerShell          │
-│     di folder project                   │
-└──────────────────┬──────────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────────┐
-│  2. Jalankan aplikasi via venv          │
-│                                         │
-│  .\venv\Scripts\python.exe src/main.py  │
-│                                         │
-│  (PENTING: harus dari terminal sendiri, │
-│   bukan dari background agent)          │
-└──────────────────┬──────────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────────┐
-│  3. Jendela kamera terbuka              │
-│     Sistem aktif dan siap digunakan     │
-│                                         │
-│  Tampilan UI:                           │
-│  ┌───────────────────────────────────┐  │
-│  │ Kanan: ON/OFF   Kiri: ON/OFF  FPS │  │
-│  │ Gesture: [HURUF]                  │  │
-│  │ ████████░░░░ Confidence: 87%      │  │
-│  │ Raw: A (0.87)                     │  │
-│  ├───────────────────────────────────┤  │
-│  │        [Video Kamera]             │  │
-│  ├───────────────────────────────────┤  │
-│  │ Terjemahan: HALO                  │  │
-│  └───────────────────────────────────┘  │
-└──────────────────┬──────────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────────┐
-│  4. GUNAKAN APLIKASI                    │
-│                                         │
-│  → Tunjukkan gesture tangan ke kamera   │
-│  → Huruf muncul otomatis di layar       │
-│  → Kata/kalimat terakumulasi            │
-└──────────────────┬──────────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────────┐
-│  5. Kontrol Keyboard                    │
-│                                         │
-│  [SPACE]     → Tambah spasi             │
-│  [BACKSPACE] → Hapus huruf terakhir     │
-│  [ENTER]     → Baca teks sekarang (TTS) │
-│  [R]         → Reset semua teks         │
-│  [ESC]       → Keluar dari aplikasi     │
-└──────────────────┬──────────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────────┐
-│  6. Output Suara (TTS) — Otomatis       │
-│                                         │
-│  Trigger: tangan tidak terdeteksi       │
-│           selama 2 detik                │
-│  Engine: gTTS (online) → pyttsx3 (off)  │
-│  Bahasa: Bahasa Indonesia               │
-└──────────────────┬──────────────────────┘
-                   │
-                   ▼
-                [SELESAI]
-              Tekan ESC untuk keluar
+┌──────────────────────────────────────────────┐
+│ 1. Jalankan Aplikasi Utama                   │
+│    python src/main.py                        │
+└──────────────────────┬───────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────┐
+│ 2. Hadapkan Tangan ke Kamera                 │
+│    Tunjukkan isyarat alfabet BISINDO.        │
+│    Sistem akan menstabilkan prediksi selama  │
+│    beberapa frame dan menambahkannya ke layar.│
+└──────────────────────┬───────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────┐
+│ 3. Konversi Khusus J                         │
+│    Tunjukkan isyarat "I", lalu tahan selama   │
+│    3 detik. Bar waktu visual akan terisi dan  │
+│    otomatis mengonversi huruf menjadi "J".    │
+└──────────────────────┬───────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────┐
+│ 4. Operasi Keyboard                          │
+│    - [SPACE]     : Tambah spasi               │
+│    - [BACKSPACE] : Hapus huruf terakhir       │
+│    - [ENTER]     : Suarakan kalimat via TTS   │
+│    - [R]         : Hapus seluruh teks         │
+│    - [ESC]       : Keluar                     │
+└──────────────────────┬───────────────────────┘
+                       │
+                       ▼
+                   [Selesai]
 ```
 
 ---
 
-## WF-4 · Pipeline Data Per Frame (Internal)
+## 6. Pemecahan Masalah (Troubleshooting)
 
-> **Ini workflow yang terjadi di dalam sistem setiap frame video**
-
-```
-Frame Video (dari kamera)
-         │
-         ▼
-  ┌─────────────────┐
-  │   OpenCV        │  Capture frame 1280×720
-  │   cv2.read()    │  Flip (mirror mode)
-  └────────┬────────┘
-           │
-           ▼
-  ┌─────────────────┐
-  │   MediaPipe     │  Deteksi hingga 2 tangan
-  │   mp.Hands()    │  → 21 landmark per tangan
-  └────────┬────────┘  → Label: "Left" / "Right"
-           │
-           ▼
-  ┌─────────────────┐
-  │   Normalisasi   │  Per tangan:
-  │   (Classifier)  │  - Relatif ke wrist (lm[0])
-  │                 │  - Scale-invariant
-  │                 │  → 63 fitur per tangan
-  └────────┬────────┘
-           │
-           ▼
-  ┌─────────────────┐
-  │   Feature       │  [63 kiri] + [63 kanan]
-  │   Concatenation │  = 126 fitur total
-  │                 │  (0.0 jika tangan tidak ada)
-  └────────┬────────┘
-           │
-           ▼
-  ┌─────────────────┐
-  │   Random Forest │  model.predict([126 fitur])
-  │   Classifier    │  → huruf (A/B/C/.../OFF/ON)
-  │                 │  → confidence (0.0–1.0)
-  └────────┬────────┘
-           │
-           ▼
-  ┌─────────────────┐
-  │   Stabilizer    │  Voting 7 frame terakhir
-  │                 │  Filter confidence ≥ 0.55
-  │                 │  Hysteresis: 3 frame konsisten
-  └────────┬────────┘
-           │
-           ▼
-  ┌─────────────────────────────────┐
-  │         OUTPUT LAYER            │
-  │                                 │
-  │  ┌────────────┐ ┌────────────┐  │
-  │  │ Teks       │ │    TTS     │  │
-  │  │ Overlay    │ │  (Suara)   │  │
-  │  │ (OpenCV)   │ │  Thread    │  │
-  │  └────────────┘ └────────────┘  │
-  └─────────────────────────────────┘
-```
+| Gejala Masalah | Diagnosis Masalah | Solusi Penanganan |
+| :--- | :--- | :--- |
+| Terjadi error `FileNotFoundError` pada model | Model klasifikasi biner belum dibuat atau terhapus. | Jalankan proses pelatihan model terlebih dahulu melalui perintah `python src/train_model.py`. |
+| Program utama terasa lambat (*lagging*) | Frame rate kamera terlalu tinggi atau pemrosesan FPS terhambat. | Pastikan kamera tidak sedang dipakai oleh aplikasi lain (seperti OBS, Zoom, dll). Tutup aplikasi berat di latar belakang. |
+| Suara TTS tidak keluar setelah tombol ENTER ditekan | Gangguan konektivitas gTTS atau COM state pada pustaka pyttsx3 mengalami kegagalan fungsi di Windows. | Sistem saat ini menggunakan Windows SAPI. Pastikan fitur suara bawaan Windows aktif dan volume perangkat tidak dibisukan (*muted*). |
+| Prediksi huruf sering berganti dengan cepat (*flickering*) | Kepercayaan diri (*confidence*) model berada di ambang batas bawah akibat pose tidak stabil. | Coba posisikan tangan Anda lebih tegak di depan kamera. Jika masih berlanjut, tambahkan sampel data latih untuk huruf tersebut untuk melatih ulang model. |
 
 ---
-
-## WF-5 · Troubleshooting & Perbaikan
-
-### Masalah Umum dan Solusi
-
-```
-Masalah terdeteksi?
-       │
-       ├─ Error: "Model tidak ditemukan"
-       │    └→  Jalankan WF-2A (collect_data) lalu WF-2B (train_model)
-       │
-       ├─ Error: mediapipe AttributeError / ImportError
-       │    └→  Gunakan venv: .\venv\Scripts\python.exe src/main.py
-       │        Jangan pakai python system global
-       │
-       ├─ Kamera tidak terbuka / layar hitam
-       │    └→  Pastikan kamera tidak dipakai aplikasi lain
-       │        Restart program, coba restart PC
-       │
-       ├─ Gesture berkedip-kedip / tidak stabil
-       │    └→  Normal untuk huruf yang mirip
-       │        Tambah sampel untuk huruf tersebut
-       │        Jalankan ulang train_model.py
-       │
-       ├─ Akurasi rendah (< 80%) untuk huruf tertentu
-       │    └→  python src/collect_data.py (Mode 3)
-       │        Tambah 50–100 sampel dengan variasi
-       │        Latih ulang model
-       │
-       └─ TTS tidak bersuara
-            ├─ Online (gTTS): Cek koneksi internet
-            └─ Offline: pip install pyttsx3 (di venv)
-```
-
----
-
-## Status & Roadmap
-
-### Progress Saat Ini
-
-| Tahap | Komponen | Status |
-|-------|----------|--------|
-| WF-1 | Setup & Environment | ✅ Selesai |
-| WF-2A | Koleksi data A–F | ✅ Selesai |
-| WF-2A | Koleksi data G–Z | 🔴 Belum |
-| WF-2B | Training model (A–F) | ✅ Selesai |
-| WF-2B | Training model (A–Z) | 🔴 Belum |
-| WF-3 | Aplikasi berjalan | ✅ Berfungsi |
-| — | Gesture dinamis J, Z | 🔴 Belum |
-| — | Testing end-to-end | 🟡 Parsial |
-
-### Langkah Selanjutnya (Prioritas)
-
-```
-🔴 SEKARANG — Wajib untuk selesaikan proyek:
-   1. Rekam data huruf G–Z (20 huruf)
-      → python src/collect_data.py → pilih Mode 1 atau 3
-      → Target: minimal 50 sampel/huruf (lebih cepat)
-      → Estimasi waktu: ±30–60 menit
-
-   2. Latih ulang model
-      → python src/train_model.py
-      → Cek akurasi per huruf ≥ 85%
-
-   3. Validasi real-time
-      → .\venv\Scripts\python.exe src/main.py
-      → Uji semua 26 huruf secara langsung
-
-🟡 SETELAH ITU — Peningkatan kualitas:
-   4. Tambah variasi sampel (200–300/huruf)
-   5. Uji dengan orang lain (bukan hanya developer)
-   6. Tuning confidence threshold
-
-🟢 OPSIONAL — Nice to have:
-   7. Gesture dinamis J dan Z
-   8. Export teks ke .txt
-   9. Simpan riwayat percakapan
-```
-
----
-
-## Kriteria Selesai (dari PRD §11)
-
-Proyek dianggap **100% selesai** jika semua checklist ini terpenuhi:
-
-- [ ] Semua 26 huruf BISINDO terdeteksi dengan akurasi ≥ 85%
-- [ ] Sistem berjalan real-time ≥ 15 FPS
-- [ ] TTS berfungsi (Bahasa Indonesia, online & offline)
-- [ ] Huruf terakumulasi menjadi kata/kalimat dengan benar
-- [ ] Auto-TTS aktif saat tangan turun selama 2 detik
-- [ ] Semua kontrol keyboard berfungsi (SPACE, BACKSPACE, ENTER, R, ESC)
-- [ ] Tidak ada crash selama 30 menit pemakaian
-
----
-
-## Quick Reference — Perintah Penting
-
-```powershell
-# Aktifkan venv (wajib sebelum apapun)
-.\venv\Scripts\Activate.ps1
-
-# ── atau tanpa aktivasi, gunakan langsung: ──────────────────
-
-# Jalankan aplikasi utama
-.\venv\Scripts\python.exe src/main.py
-
-# Kumpulkan data baru
-.\venv\Scripts\python.exe src/collect_data.py
-
-# Latih ulang model
-.\venv\Scripts\python.exe src/train_model.py
-
-# Test kamera saja
-.\venv\Scripts\python.exe src/camera_test.py
-
-# Test MediaPipe / hand tracking
-.\venv\Scripts\python.exe src/hand_tracking_test.py
-
-# Test TTS / audio
-.\venv\Scripts\python.exe src/test_audio.py
-```
-
----
-
-*Dokumen ini mengacu pada PRDBisindoGesture.md v1.0*  
-*Update jika ada perubahan signifikan pada arsitektur, workflow, atau scope.*
+*Dokumen ini merupakan panduan operasional standar untuk BISINDO Gesture Recognition System v2.0.*
