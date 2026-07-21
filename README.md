@@ -25,18 +25,32 @@ Kamera → MediaPipe → Normalisasi → ML Model → Stabilizer → TTS + Teks
 
 ## Teknologi yang Digunakan (Tech Stack)
 
-Aplikasi ini dibangun menggunakan kombinasi pustaka pemrosesan citra (*computer vision*), analisis data, dan kecerdasan buatan berikut:
+Berikut adalah rincian lengkap dari *technology stack* (kumpulan teknologi) yang digunakan dalam pengembangan **BISINDO Gesture Recognition System v2.0**:
 
-| Pustaka / Teknologi | Peran & Fungsi dalam Sistem |
-| :--- | :--- |
-| **Python (3.9 - 3.11)** | Bahasa pemrograman utama sebagai pengintegrasi seluruh modul pemrosesan video, model klasifikasi, dan *output* suara. |
-| **OpenCV (`opencv-python`)** | Mengambil aliran *feed* video dari kamera (*webcam*) secara *real-time*, merender elemen UI (seperti teks terjemahan dan bar indikator visual), serta menampilkan jendela interaksi. |
-| **MediaPipe (`mediapipe`)** | Kerangka kerja deteksi tubuh dari Google yang bertugas melacak 21 titik koordinat landmark 3D (X, Y, Z) pada tangan kiri dan kanan secara instan. |
-| **Scikit-Learn (`scikit-learn`)** | Digunakan untuk mengonfigurasi dan melatih model klasifikasi *Ensemble* (kombinasi *Random Forest* dengan 300 pepohonan keputusan dan *Support Vector Machine* RBF) untuk memprediksi huruf berdasarkan bentuk landmark tangan. |
-| **NumPy (`numpy`)** | Pustaka komputasi numerik yang mengolah koordinat landmark tangan 3D, melakukan normalisasi geometris (*scale & position invariant*), dan menghitung nilai cosinus sudut sendi jari. |
-| **Windows SAPI (`System.Speech`)** | Mesin suara utama (*Text-to-Speech*) berbasis sistem Windows (via *PowerShell subprocess*) yang bekerja secara *offline*, hemat memori, dan bebas *crash* saat dipanggil berulang kali. |
-| **gTTS & Pygame** | Pustaka *Text-to-Speech* daring (*Google Translate API*) bersama pemutar audio *Pygame* sebagai alternatif cadangan (*fallback*) untuk platform non-Windows. |
+### 1. Languages & Frameworks
+* **Python (v3.9 - v3.11):** Bahasa pemrograman inti yang digunakan untuk menyusun seluruh logika alur pemrosesan video, manipulasi data, pemanggilan model AI, dan integrasi modul suara.
+* **MediaPipe Framework (Google):** Pustaka deteksi cerdas yang mengekstraksi struktur tangan secara langsung ke dalam bentuk 21 koordinat landmark 3D (X, Y, Z).
+* **Scikit-Learn:** Pustaka kerangka kerja (*framework*) machine learning utama yang digunakan untuk melatih dan mengeksekusi model klasifikasi **Ensemble (Random Forest + SVM)**.
 
+### 2. Database & Infrastructure
+* **Sistem File Lokal (CSV-based):** Penyimpanan dataset koordinat landmark tangan disimpan secara terstruktur di dalam berkas lokal berbentuk CSV (`dataset/bisindo_*.csv`). Tidak memerlukan database SQL/NoSQL eksternal, membuat sistem lebih ringan dan portabel.
+* **Pickle Serialization (.pkl):** Infrastruktur biner untuk menyimpan (*serialize*) dan memuat ulang (*deserialize*) model hasil latihan kecerdasan buatan (`gesture_model.pkl`) secara instan.
+* **Python Virtual Environment (venv):** Infrastruktur isolasi dependensi agar versi pustaka tetap stabil dan tidak berbenturan dengan lingkungan Python global sistem.
+
+### 3. Design, Tools & APIs
+* **OpenCV (`opencv-python`):** Pustaka *computer vision* untuk menangkap aliran kamera webcam secara real-time, merender UI overlay (seperti visualizer bar keyakinan, teks terjemahan, dan info debug), serta menampilkan jendela interaktif utama.
+* **Windows SAPI API (`System.Speech`):** Antarmuka pemrograman bawaan Windows yang diakses menggunakan utilitas PowerShell untuk menghasilkan suara *Text-to-Speech (TTS)* secara luring (*offline*) dengan tingkat kestabilan tinggi.
+* **Google TTS API (gTTS):** API cloud untuk menghasilkan output suara Bahasa Indonesia yang natural sebagai alternatif jika sistem dijalankan pada platform non-Windows.
+* **Pygame Mixer API:** Pustaka audio player untuk memainkan berkas audio hasil *generate* dari gTTS API.
+* **Git & GitHub:** Alat manajemen kontrol versi kode dan manajemen repositori proyek.
+
+### 4. Networking & Security
+* **100% Offline Core Processing:** Keamanan privasi visual pengguna terjamin sepenuhnya karena proses analisis citra kamera, ekstraksi landmark oleh MediaPipe, klasifikasi ML, dan output suara SAPI dilakukan secara lokal di komputer pengguna tanpa mengirim data video/gambar ke server mana pun.
+* **HTTPS Protocol (SSL/TLS):** Digunakan secara aman untuk enkripsi komunikasi data eksternal hanya saat melakukan panggilan HTTP ke API gTTS (Google Cloud) untuk TTS cadangan online.
+* **PowerShell Subprocess Sandbox:** Menjalankan perintah suara Windows SAPI secara terisolasi via subprocess Python tanpa memerlukan hak akses administrasi (*Administrator privileges*), sehingga aman dari celah eksploitasi sistem operasi.
+
+### 5. Ringkasan Keseluruhan Stack
+Aplikasi ini dirancang sebagai solusi desktop **Desktop-Native** yang mengombinasikan kekuatan pustaka analisis citra Google (MediaPipe) dengan performa model klasifikasi tradisional dari Scikit-Learn. Seluruh sistem dioptimalkan agar dapat berjalan pada komputer berspesifikasi rendah (*low-end PC*) karena proses komputasinya sangat efisien dan tidak membutuhkan akselerasi GPU eksternal.
 
 ## Persiapan & Instalasi
 
